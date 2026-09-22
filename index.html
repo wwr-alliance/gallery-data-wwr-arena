@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discord Gallery</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;color:#eee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+header{padding:1.2rem 1.5rem;background:#1a1a1a;border-bottom:1px solid #2a2a2a;display:flex;align-items:baseline;gap:1rem}
+h1{font-size:1.1rem;font-weight:600}
+#meta{font-size:.8rem;color:#666}
+#gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(600px,1fr));gap:8px;padding:12px}
+.card{background:#1e1e1e;border-radius:6px;overflow:hidden;cursor:pointer;transition:opacity .15s}
+.card:hover{opacity:.85}
+.card img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover;background:#2a2a2a}
+.info{padding:7px 9px}
+.author{font-size:.82rem;font-weight:600;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.date{font-size:.72rem;color:#555;margin-top:2px}
+#sentinel{height:1px}
+#status{text-align:center;padding:3rem;color:#555}
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;align-items:center;justify-content:center;cursor:zoom-out}
+#lightbox.open{display:flex}
+#lightbox img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:4px}
+</style>
+</head>
+<body>
+<header><h1>Discord Gallery</h1><span id="meta"></span></header>
+<div id="gallery"></div>
+<div id="sentinel"></div>
+<div id="status">読み込み中...</div>
+<div id="lightbox"><img id="lb-img" src="" alt=""></div>
+<script>
+const lb=document.getElementById('lightbox');
+const lbImg=document.getElementById('lb-img');
+lb.addEventListener('click',()=>lb.classList.remove('open'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')lb.classList.remove('open')});
+const PAGE=6;
+let allImages=[],loaded=0;
+const gallery=document.getElementById('gallery');
+const sentinel=document.getElementById('sentinel');
+const status=document.getElementById('status');
+function makeCard(img){
+  const card=document.createElement('div');
+  card.className='card';
+  const date=new Date(img.timestamp).toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const el=document.createElement('img');
+  el.src=img.filepath;el.alt=img.author;el.loading='lazy';
+  const info=document.createElement('div');
+  info.className='info';
+  info.innerHTML='<div class="author">'+img.author+'</div><div class="date">'+date+'</div>';
+  card.appendChild(el);card.appendChild(info);
+  card.addEventListener('click',()=>{lbImg.src=img.filepath;lb.classList.add('open')});
+  return card;
+}
+function loadMore(){
+  if(loaded>=allImages.length){sentinel.style.display='none';return}
+  const frag=document.createDocumentFragment();
+  allImages.slice(loaded,loaded+PAGE).forEach(img=>frag.appendChild(makeCard(img)));
+  gallery.appendChild(frag);
+  loaded+=Math.min(PAGE,allImages.length-loaded);
+  if(loaded>=allImages.length)sentinel.style.display='none';
+}
+const observer=new IntersectionObserver(e=>{if(e[0].isIntersecting)loadMore()},{rootMargin:'150px'});
+fetch('index.json').then(r=>r.json()).then(data=>{
+  allImages=data.images||[];
+  document.getElementById('meta').textContent=allImages.length+' 枚 · 更新: '+new Date(data.created_at).toLocaleString('ja-JP');
+  if(!allImages.length){status.textContent='画像がありません';return}
+  status.style.display='none';
+  loadMore();
+  observer.observe(sentinel);
+}).catch(()=>{status.textContent='読み込みに失敗しました'});
+</script>
+</body>
+</html>
